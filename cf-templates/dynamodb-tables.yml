@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'This template will create Dynamodb tables'
+
+
+Resources:
+  FeatureValueTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      ProvisionedThroughput:
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TableName: 'feature-value-dynamodb'
+      AttributeDefinitions:
+        - AttributeName: "entity_id"
+          AttributeType: "S"
+        - AttributeName: "feature_name"
+          AttributeType: "S"                           
+      KeySchema:
+        - AttributeName: "entity_id"
+          KeyType: "HASH"
+        - AttributeName: "feature_name"
+          KeyType: "RANGE"          
+
+  FeatureMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      ProvisionedThroughput:
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TableName: 'feature-metadata-dynamodb'
+      AttributeDefinitions:
+        - AttributeName: "feature_name"
+          AttributeType: "S"                                                          
+      KeySchema:
+        - AttributeName: "feature_name"
+          KeyType: "HASH"
+
+
+
+
+
+
