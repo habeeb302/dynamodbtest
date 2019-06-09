@@ -21,6 +21,7 @@ table = dynamodb.Table('feature-value-dynamodb')
 #        title = movie['title']
 #        info = movie['info']
 
+
 print("Adding features:")
 with table.batch_writer() as batch:
 

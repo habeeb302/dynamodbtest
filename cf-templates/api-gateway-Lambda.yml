@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'This template will create API gateway and lambda'
+
+Parameters:
+  apiGatewayStageName:
+    Type: "String"
+    Default: "prod"
+
+  lambdaFunctionName:
+    Type: "String"    
+    Default: "featureapi1"
+
+Resources:
+  FeatureApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      Name: feature-API1
+      Description: API to trigger
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref FeatureApiGateway
+      ParentId: !GetAtt 
+        - FeatureApiGateway
+        - RootResourceId
+      PathPart: "featureapi"     
+
+  FeatureApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt lambdaFunction.Arn
+        IntegrationResponses:
+          - StatusCode: 200
+ 
+
+      MethodResponses: 
+        - StatusCode: 200     
+
+      ResourceId: !Ref ApiGatewayResource
+      RestApiId: !Ref FeatureApiGateway      
+
+  ApiGatewayResourceStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      RestApiId: !Ref FeatureApiGateway
+      DeploymentId: !Ref ApiGatewayDeployment
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: "*"
+#          LoggingLevel: INFO
+#          DataTraceEnabled: 'true'
+
+  ApiGatewayDeployment:   
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - FeatureApiGatewayMethod     
+    Properties:
+      RestApiId: !Ref FeatureApiGateway
+      StageName: "prod" 
+
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn:
+      - ApiGatewayDeployment
+      - ApiGatewayResourceStage
+    Properties:
+      Name: featureapi-Key1
+      Description: CloudFormation API Key V1
+      Enabled: 'true'
+      StageKeys:
+        - RestApiId: !Ref FeatureApiGateway
+          StageName: "Prod"
+
+  usagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages:
+        - ApiId: !Ref FeatureApiGateway
+          Stage: !Ref ApiGatewayResourceStage
+      Description: FeatureAPIusageplan
+      Quota:
+        Limit: 5000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: featureapiUsagePlan1
+
+  lambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: codepackage
+        S3Key: dynamodbread.zip
+      Description: featureapi1
+      FunctionName: featureapi1
+      Handler: dynamodbread.dynamoread
+      MemorySize: 128
+      Role: !GetAtt lambdaIAMRole.Arn
+      Runtime: python3.6
+      Timeout: 10
+
+  lambdaApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt lambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${FeatureApiGateway}/*/POST/featureapi
+
+  lambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${lambdaFunctionName}:*
+          PolicyName: lambda
+
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "s3:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: s3     
+
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "dynamodb:*"
+                Effect: Allow
+                Resource: "*"
+          PolicyName: dynamodb           
+                 
+  lambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${lambdaFunctionName}
+      RetentionInDays: 90      
