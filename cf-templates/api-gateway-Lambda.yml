@@ -40,11 +40,8 @@ Resources:
           - lambdaArn: !GetAtt lambdaFunction.Arn
         IntegrationResponses:
           - StatusCode: 200
- 
-
       MethodResponses: 
-        - StatusCode: 200     
-
+        - StatusCode: 200
       ResourceId: !Ref ApiGatewayResource
       RestApiId: !Ref FeatureApiGateway      
 
