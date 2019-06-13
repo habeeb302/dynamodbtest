@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'This template will create an AWS Kinesis Firehose DeliveryStream'
+
+Parameters:
+    CFNFirehoseDeliveryStreamName:
+        Description: This will be used to name the Firehose DeliveryStream
+        Type: String
+
+    CFNKinesisStreamArn :
+        Description: This will be used to pass Kinesis DataStream
+        Type : String
+
+    CFNKinesisStreamRoleArn:
+        Description: This will be used to pass Kinesis DataStream Role
+        Type : String
+
+    CFNS3bucketArn:
+        Description: This is target S3 bucket to store data
+        Type: String
+
+Resources :
+    FirehoseDeliverystream:
+        Type: AWS::KinesisFirehose::DeliveryStream
+        Properties:
+            DeliveryStreamName: !Ref CFNFirehoseDeliveryStreamName
+            DeliveryStreamType: KinesisStreamAsSource
+            KinesisStreamSourceConfiguration:
+                KinesisStreamARN: !Ref CFNKinesisStreamArn
+                RoleARN: !Ref CFNKinesisStreamRoleArn
+            ExtendedS3DestinationConfiguration:
+                BucketARN: !Ref CFNS3bucketArn
+                BufferingHints:
+                    IntervalInSeconds: 60
+                    SizeInMBs: 50
+                CompressionFormat: UNCOMPRESSED
+                Prefix: data
+                RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+
+    FirehoseDeliveryRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: ''
+                Effect: Allow
+                Principal:
+                  Service: firehose.amazonaws.com
+                Action: 'sts:AssumeRole'
+                Condition:
+                  StringEquals:
+                    'sts:ExternalId': !Ref 'AWS::AccountId'
+
+    FirehoseDeliveryPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+          PolicyName: KinesisFirehoseCloudformationPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:AbortMultipartUpload'
+                  - 's3:GetBucketLocation'
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                  - 's3:ListBucketMultipartUploads'
+                  - 's3:PutObject'
+                Resource:
+                  - !Ref CFNS3bucketArn
+                  - !Join
+                    - ''
+                    - - !Ref CFNS3bucketArn
+                      - '*'
+
+          Roles:
+            - !Ref FirehoseDeliveryRole
+
+Outputs:
+  MongoCDCStream:
+      Value: !Ref FirehoseDeliverystream
+      Export:
+          Name: !Sub ${AWS::StackName}-FirehoseDeliverystream
